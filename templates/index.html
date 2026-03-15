@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hunger Games — Video Pipeline</title>
+<style>
+/* ── Reset & Theme ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0f1117;
+  --surface:   #1a1d2e;
+  --surface2:  #232738;
+  --border:    #2e3348;
+  --text:      #e4e4e7;
+  --muted:     #8b8fa3;
+  --accent:    #e94560;
+  --accent2:   #6c63ff;
+  --green:     #22c55e;
+  --radius:    12px;
+  --font:      'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+header h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+header p {
+  color: var(--muted);
+  margin-top: 6px;
+  font-size: 0.95rem;
+}
+
+/* ── Stepper ────────────────────────────────────────────────────── */
+.stepper {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 36px;
+}
+.stepper .step-dot {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.4s;
+}
+.stepper .step-dot.done    { background: var(--green); }
+.stepper .step-dot.active  { background: var(--accent); }
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  margin-bottom: 20px;
+  transition: opacity 0.3s;
+}
+.card.locked {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.card-header .num {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.85rem;
+  background: var(--surface2);
+  color: var(--muted);
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+}
+.card-header .num.done  { background: var(--green); color: #fff; border-color: var(--green); }
+.card-header .num.active { border-color: var(--accent); color: var(--accent); }
+.card-header h2 { font-size: 1.1rem; font-weight: 600; }
+.card-header .badge {
+  margin-left: auto;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--surface2);
+  color: var(--muted);
+}
+.card-header .badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
+
+/* ── Inputs ─────────────────────────────────────────────────────── */
+input[type="text"], textarea, select {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.95rem;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+}
+textarea {
+  resize: vertical;
+  min-height: 200px;
+  line-height: 1.65;
+  font-family: 'Georgia', serif;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 22px;
+  border: none; border-radius: 8px;
+  font-family: var(--font);
+  font-size: 0.9rem; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #d6304e; }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--border); }
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  align-items: center;
+}
+
+/* ── Progress bar ───────────────────────────────────────────────── */
+.progress-wrap {
+  margin-top: 16px;
+  display: none;
+}
+.progress-wrap.visible { display: block; }
+.progress-bar-bg {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.3s;
+}
+.progress-text {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* ── Audio preview ──────────────────────────────────────────────── */
+.segment-list {
+  list-style: none;
+  margin-top: 14px;
+}
+.segment-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 0.88rem;
+}
+.segment-list li .idx {
+  color: var(--muted);
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 24px;
+}
+.segment-list li .dur {
+  color: var(--accent);
+  margin-left: auto;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.segment-list audio {
+  height: 32px;
+  flex-shrink: 0;
+}
+
+/* ── Image gallery ──────────────────────────────────────────────── */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.gallery img {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  aspect-ratio: 9/16;
+  object-fit: cover;
+}
+
+/* ── Video player ───────────────────────────────────────────────── */
+.video-wrap {
+  margin-top: 14px;
+  text-align: center;
+}
+.video-wrap video {
+  max-width: 360px;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+/* ── Status toast ───────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: 100;
+}
+#toast.visible { opacity: 1; }
+#toast.error { border-color: var(--accent); color: var(--accent); }
+
+/* ── Misc ───────────────────────────────────────────────────────── */
+.mt-sm { margin-top: 10px; }
+.text-muted { color: var(--muted); font-size: 0.85rem; }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <h1>Hunger Games &mdash; Video Pipeline</h1>
+    <p>RAG search &rarr; Script &rarr; Audio &rarr; Images &rarr; Final video</p>
+  </header>
+
+  <!-- Stepper dots -->
+  <div class="stepper">
+    <div class="step-dot" id="dot-1"></div>
+    <div class="step-dot" id="dot-2"></div>
+    <div class="step-dot" id="dot-3"></div>
+    <div class="step-dot" id="dot-4"></div>
+  </div>
+
+  <!-- ────────────────────────── Step 1: Script ──────────────────────── -->
+  <div class="card" id="card-1">
+    <div class="card-header">
+      <div class="num" id="num-1">1</div>
+      <h2>Topic &amp; Script</h2>
+      <span class="badge" id="badge-1"></span>
+    </div>
+
+    <input type="text" id="topic-input" placeholder="Enter a topic, e.g. Finnick Odair, The 74th Hunger Games…">
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-search" onclick="generateScript()">
+        Search &amp; Generate
+      </button>
+      <div class="progress-wrap" id="prog-1">
+        <div class="progress-bar-bg"><div class="progress-bar" id="pbar-1"></div></div>
+        <div class="progress-text" id="ptxt-1"></div>
+      </div>
+    </div>
+
+    <div id="script-area" style="display:none; margin-top:18px;">
+      <label class="text-muted">Edit the script below, then proceed.</label>
+      <textarea id="script-editor" class="mt-sm"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="saveScript()">Save changes</button>
+        <button class="btn btn-primary" id="btn-to-audio" onclick="generateAudio()">
+          Generate Audio &rarr;
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────── Step 2: Audio ───────────────────────── -->
+  <div class="card locked" id="card-2">
+    <div class="card-header">
+      <div class="num" id="num-2">2</div>
+      <h2>Audio (TTS)</h2>
+      <span class="badge" id="badge-2"></span>
+    </div>
+
+    <div class="progress-wrap" id="prog-2">
+      <div class="progress-bar-bg"><div class="progress-bar" id="pbar-2"></div></div>
+      <div class="progress-text" id="ptxt-2"></div>
+    </div>
+
+    <ul class="segment-list" id="audio-segments"></ul>
+
+    <div class="btn-row" id="audio-actions" style="display:none">
+      <button class="btn btn-primary" id="btn-to-images" onclick="generateImages()">
+        Generate Images &rarr;
+      </button>
+    </div>
+  </div>
+
+  <!-- ────────────────────────── Step 3: Images ──────────────────────── -->
+  <div class="card locked" id="card-3">
+    <div class="card-header">
+      <div class="num" id="num-3">3</div>
+      <h2>Images</h2>
+      <span class="badge" id="badge-3"></span>
+    </div>
+
+    <div class="progress-wrap" id="prog-3">
+      <div class="progress-bar-bg"><div class="progress-bar" id="pbar-3"></div></div>
+      <div class="progress-text" id="ptxt-3"></div>
+    </div>
+
+    <div class="gallery" id="image-gallery"></div>
+
+    <div class="btn-row" id="image-actions" style="display:none">
+      <label class="text-muted" style="margin-right:8px">Encoder:</label>
+      <select id="encoder-select" style="width:auto;max-width:160px">
+        <option value="auto">Auto-detect</option>
+        <option value="nvenc">NVIDIA (NVENC)</option>
+        <option value="amf">AMD (AMF)</option>
+        <option value="qsv">Intel (QSV)</option>
+        <option value="cpu">CPU (libx264)</option>
+      </select>
+      <button class="btn btn-primary" onclick="stitchVideo()">
+        Build Video &rarr;
+      </button>
+    </div>
+  </div>
+
+  <!-- ────────────────────────── Step 4: Final Video ─────────────────── -->
+  <div class="card locked" id="card-4">
+    <div class="card-header">
+      <div class="num" id="num-4">4</div>
+      <h2>Final Video</h2>
+      <span class="badge" id="badge-4"></span>
+    </div>
+
+    <div class="progress-wrap" id="prog-4">
+      <div class="progress-bar-bg"><div class="progress-bar" id="pbar-4"></div></div>
+      <div class="progress-text" id="ptxt-4"></div>
+    </div>
+
+    <div class="video-wrap" id="video-result" style="display:none">
+      <video id="final-video" controls></video>
+      <div class="btn-row" style="justify-content:center; margin-top:12px">
+        <a class="btn btn-secondary" id="download-link" download="final.mp4">Download MP4</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+/* ── Helpers ─────────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+let busy = false;
+
+function toast(msg, isError) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'visible' + (isError ? ' error' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = '', 4000);
+}
+
+function setProgress(step, pct, msg) {
+  const wrap = $('prog-' + step);
+  const bar  = $('pbar-' + step);
+  const txt  = $('ptxt-' + step);
+  if (!wrap) return;
+  wrap.classList.add('visible');
+  if (pct >= 0) bar.style.width = pct + '%';
+  if (msg) txt.textContent = msg;
+}
+
+function hideProgress(step) {
+  const wrap = $('prog-' + step);
+  if (wrap) wrap.classList.remove('visible');
+}
+
+function updateStepper(completedStep) {
+  for (let i = 1; i <= 4; i++) {
+    const dot = $('dot-' + i);
+    const num = $('num-' + i);
+    const card = $('card-' + i);
+    dot.className = 'step-dot';
+    num.className = 'num';
+    card.classList.remove('locked');
+
+    if (i < completedStep + 1) {
+      dot.classList.add('done');
+      num.classList.add('done');
+    } else if (i === completedStep + 1) {
+      dot.classList.add('active');
+      num.classList.add('active');
+    } else {
+      card.classList.add('locked');
+    }
+  }
+}
+
+function setBadge(step, text, ok) {
+  const b = $('badge-' + step);
+  b.textContent = text;
+  b.className = 'badge' + (ok ? ' ok' : '');
+}
+
+async function post(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+function disableButtons(on) {
+  busy = on;
+  document.querySelectorAll('.btn').forEach(b => {
+    if (on) b.setAttribute('disabled', '');
+    else b.removeAttribute('disabled');
+  });
+}
+
+function formatDur(s) {
+  const m = Math.floor(s / 60);
+  const sec = (s % 60).toFixed(1);
+  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+}
+
+/* ── SSE listener ────────────────────────────────────────────────── */
+const sse = new EventSource('/api/events');
+
+sse.addEventListener('status', e => {
+  const d = JSON.parse(e.data);
+  setProgress(d.step, d.progress ?? -1, d.message);
+});
+
+sse.addEventListener('script_done', e => {
+  const d = JSON.parse(e.data);
+  $('script-editor').value = d.script;
+  $('script-area').style.display = 'block';
+  hideProgress(1);
+  setBadge(1, 'done', true);
+  updateStepper(1);
+  disableButtons(false);
+  toast('Script generated');
+});
+
+sse.addEventListener('audio_done', e => {
+  const d = JSON.parse(e.data);
+  renderSegments(d.segments, d.total_duration);
+  hideProgress(2);
+  setBadge(2, formatDur(d.total_duration), true);
+  $('audio-actions').style.display = 'flex';
+  updateStepper(2);
+  disableButtons(false);
+  toast('Audio generated — ' + d.segments.length + ' segments');
+});
+
+sse.addEventListener('images_done', e => {
+  const d = JSON.parse(e.data);
+  renderImages(d.images);
+  hideProgress(3);
+  setBadge(3, d.images.length + ' images', true);
+  $('image-actions').style.display = 'flex';
+  updateStepper(3);
+  disableButtons(false);
+  toast('Images generated');
+});
+
+sse.addEventListener('video_done', e => {
+  const d = JSON.parse(e.data);
+  const url = '/output/' + d.video + '?t=' + Date.now();
+  $('final-video').src = url;
+  $('download-link').href = url;
+  $('video-result').style.display = 'block';
+  hideProgress(4);
+  setBadge(4, 'ready', true);
+  updateStepper(4);
+  disableButtons(false);
+  toast('Video ready!');
+});
+
+sse.addEventListener('error', e => {
+  const d = JSON.parse(e.data);
+  toast(d.message, true);
+  disableButtons(false);
+  for (let i = 1; i <= 4; i++) hideProgress(i);
+});
+
+/* ── Renderers ───────────────────────────────────────────────────── */
+function renderSegments(segments, totalDur) {
+  const ul = $('audio-segments');
+  ul.innerHTML = '';
+  segments.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span class="idx">${i + 1}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.text}</span>
+      <audio controls preload="none" src="/output/audio/segment_${String(i).padStart(3,'0')}.wav"></audio>
+      <span class="dur">${s.duration_seconds.toFixed(1)}s</span>
+    `;
+    ul.appendChild(li);
+  });
+}
+
+function renderImages(images) {
+  const g = $('image-gallery');
+  g.innerHTML = '';
+  images.forEach(src => {
+    const img = document.createElement('img');
+    img.src = '/output/' + src + '?t=' + Date.now();
+    img.loading = 'lazy';
+    g.appendChild(img);
+  });
+}
+
+/* ── Actions ─────────────────────────────────────────────────────── */
+async function generateScript() {
+  const topic = $('topic-input').value.trim();
+  if (!topic) return toast('Enter a topic', true);
+  disableButtons(true);
+  setProgress(1, 0, 'Starting…');
+  const r = await post('/api/generate-script', { topic });
+  if (r.error) { toast(r.error, true); disableButtons(false); }
+}
+
+async function saveScript() {
+  const script = $('script-editor').value.trim();
+  if (!script) return toast('Script is empty', true);
+  const r = await post('/api/save-script', { script });
+  if (r.ok) toast('Script saved');
+  else toast(r.error, true);
+}
+
+async function generateAudio() {
+  await saveScript();
+  disableButtons(true);
+  setProgress(2, 0, 'Starting TTS…');
+  const r = await post('/api/generate-audio', {});
+  if (r.error) { toast(r.error, true); disableButtons(false); }
+}
+
+async function generateImages() {
+  disableButtons(true);
+  setProgress(3, 0, 'Starting image generation…');
+  const r = await post('/api/generate-images', {});
+  if (r.error) { toast(r.error, true); disableButtons(false); }
+}
+
+async function stitchVideo() {
+  const encoder = $('encoder-select').value;
+  disableButtons(true);
+  setProgress(4, 0, 'Starting…');
+  const r = await post('/api/stitch-video', { encoder });
+  if (r.error) { toast(r.error, true); disableButtons(false); }
+}
+
+/* ── Page-load recovery ──────────────────────────────────────────── */
+async function recoverState() {
+  const s = await (await fetch('/api/state')).json();
+  if (s.step >= 1 && s.script) {
+    $('topic-input').value = s.topic;
+    $('script-editor').value = s.script;
+    $('script-area').style.display = 'block';
+    setBadge(1, 'done', true);
+  }
+  if (s.step >= 2 && s.segments.length) {
+    renderSegments(s.segments, s.total_duration);
+    setBadge(2, formatDur(s.total_duration), true);
+    $('audio-actions').style.display = 'flex';
+  }
+  if (s.step >= 3 && s.images.length) {
+    renderImages(s.images);
+    setBadge(3, s.images.length + ' images', true);
+    $('image-actions').style.display = 'flex';
+  }
+  if (s.has_video) {
+    const url = '/output/video/final.mp4?t=' + Date.now();
+    $('final-video').src = url;
+    $('download-link').href = url;
+    $('video-result').style.display = 'block';
+    setBadge(4, 'ready', true);
+  }
+  updateStepper(s.step);
+}
+recoverState();
+
+/* Submit on Enter in topic input */
+$('topic-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') generateScript();
+});
+</script>
+</body>
+</html>
