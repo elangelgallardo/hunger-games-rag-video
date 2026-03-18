@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hunger Games — Video Pipeline</title>
+<title>Video Pipeline</title>
 <style>
 /* ── Reset & Theme ──────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,85 +27,79 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  -webkit-text-size-adjust: 100%;
 }
 
-/* ── Layout ─────────────────────────────────────────────────────── */
+/* ── Layout — mobile first ─────────────────────────────────────── */
 .app {
   max-width: 960px;
   margin: 0 auto;
-  padding: 32px 24px 80px;
+  padding: 16px 12px 80px;
 }
 
-header {
-  text-align: center;
-  margin-bottom: 40px;
+header { text-align: center; margin-bottom: 24px; }
+header h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; }
+header p { color: var(--muted); margin-top: 4px; font-size: 0.82rem; }
+
+/* ── Top bar ───────────────────────────────────────────────────── */
+.top-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
 }
-header h1 {
-  font-size: 1.8rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+.top-bar .row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
-header p {
-  color: var(--muted);
-  margin-top: 6px;
-  font-size: 0.95rem;
+.top-bar select { flex: 1; min-width: 0; }
+.top-bar .spacer { display: none; }
+.top-bar a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
+.top-bar a:hover { text-decoration: underline; }
 
 /* ── Stepper ────────────────────────────────────────────────────── */
-.stepper {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 36px;
-}
+.stepper { display: flex; gap: 4px; margin-bottom: 20px; }
 .stepper .step-dot {
-  flex: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--border);
-  transition: background 0.4s;
+  flex: 1; height: 4px; border-radius: 2px;
+  background: var(--border); transition: background 0.4s;
 }
-.stepper .step-dot.done    { background: var(--green); }
-.stepper .step-dot.active  { background: var(--accent); }
+.stepper .step-dot.done   { background: var(--green); }
+.stepper .step-dot.active { background: var(--accent); }
 
 /* ── Cards ──────────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 28px;
-  margin-bottom: 20px;
+  padding: 16px;
+  margin-bottom: 14px;
   transition: opacity 0.3s;
 }
-.card.locked {
-  opacity: 0.35;
-  pointer-events: none;
-}
+.card.locked { opacity: 0.35; pointer-events: none; }
 .card-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
 }
 .card-header .num {
-  width: 32px; height: 32px;
-  border-radius: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 0.85rem;
-  background: var(--surface2);
-  color: var(--muted);
-  border: 2px solid var(--border);
-  flex-shrink: 0;
+  font-weight: 700; font-size: 0.8rem;
+  background: var(--surface2); color: var(--muted);
+  border: 2px solid var(--border); flex-shrink: 0;
 }
 .card-header .num.done  { background: var(--green); color: #fff; border-color: var(--green); }
 .card-header .num.active { border-color: var(--accent); color: var(--accent); }
-.card-header h2 { font-size: 1.1rem; font-weight: 600; }
+.card-header h2 { font-size: 1rem; font-weight: 600; }
 .card-header .badge {
-  margin-left: auto;
-  font-size: 0.75rem;
-  padding: 3px 10px;
-  border-radius: 20px;
-  background: var(--surface2);
-  color: var(--muted);
+  margin-left: auto; font-size: 0.7rem;
+  padding: 2px 8px; border-radius: 20px;
+  background: var(--surface2); color: var(--muted);
 }
 .card-header .badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
 
@@ -117,30 +111,25 @@ input[type="text"], textarea, select {
   border-radius: 8px;
   color: var(--text);
   font-family: var(--font);
-  font-size: 0.95rem;
-  padding: 10px 14px;
+  font-size: 16px; /* prevents iOS zoom */
+  padding: 10px 12px;
   outline: none;
   transition: border-color 0.2s;
+  -webkit-appearance: none;
 }
-input:focus, textarea:focus, select:focus {
-  border-color: var(--accent);
-}
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 textarea {
-  resize: vertical;
-  min-height: 200px;
-  line-height: 1.65;
-  font-family: 'Georgia', serif;
+  resize: vertical; min-height: 160px;
+  line-height: 1.6; font-family: 'Georgia', serif;
 }
 
 /* ── Buttons ────────────────────────────────────────────────────── */
 .btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 10px 22px;
-  border: none; border-radius: 8px;
-  font-family: var(--font);
-  font-size: 0.9rem; font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 18px; border: none; border-radius: 8px;
+  font-family: var(--font); font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; transition: background 0.2s, transform 0.1s;
+  white-space: nowrap;
 }
 .btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -148,124 +137,174 @@ textarea {
 .btn-primary:hover:not(:disabled) { background: #d6304e; }
 .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
 .btn-secondary:hover:not(:disabled) { background: var(--border); }
+.btn-sm { padding: 7px 12px; font-size: 0.78rem; }
+.btn-full { width: 100%; }
 
+/* ── Button rows — stack on mobile ─────────────────────────────── */
 .btn-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 16px;
-  align-items: center;
+  display: flex; flex-direction: column; gap: 8px; margin-top: 12px;
 }
+.btn-row .btn { width: 100%; }
+
+.option-row {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 12px;
+}
+.option-row label { font-size: 0.8rem; color: var(--muted); margin: 0; }
+.option-row select { width: 100%; }
 
 /* ── Progress bar ───────────────────────────────────────────────── */
-.progress-wrap {
-  margin-top: 16px;
-  display: none;
-}
+.progress-wrap { margin-top: 12px; display: none; }
 .progress-wrap.visible { display: block; }
 .progress-bar-bg {
-  height: 6px;
-  background: var(--surface2);
-  border-radius: 3px;
-  overflow: hidden;
+  height: 6px; background: var(--surface2);
+  border-radius: 3px; overflow: hidden;
 }
 .progress-bar {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
-  width: 0%;
-  transition: width 0.3s;
+  height: 100%; background: var(--accent);
+  border-radius: 3px; width: 0%; transition: width 0.3s;
 }
-.progress-text {
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin-top: 6px;
-}
+.progress-text { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
 
 /* ── Audio preview ──────────────────────────────────────────────── */
-.segment-list {
-  list-style: none;
-  margin-top: 14px;
-}
+.segment-list { list-style: none; margin-top: 12px; }
 .segment-list li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background: var(--surface2);
-  border-radius: 8px;
-  margin-bottom: 6px;
-  font-size: 0.88rem;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: var(--surface2);
+  border-radius: 8px; margin-bottom: 5px; font-size: 0.82rem;
+  flex-wrap: wrap;
 }
-.segment-list li .idx {
-  color: var(--muted);
-  font-weight: 700;
-  flex-shrink: 0;
-  width: 24px;
+.segment-list li .idx { color: var(--muted); font-weight: 700; flex-shrink: 0; width: 20px; }
+.segment-list li .seg-text {
+  flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
 }
 .segment-list li .dur {
-  color: var(--accent);
-  margin-left: auto;
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
+  color: var(--accent); flex-shrink: 0;
+  font-variant-numeric: tabular-nums; font-size: 0.78rem;
 }
-.segment-list audio {
-  height: 32px;
-  flex-shrink: 0;
-}
+.segment-list audio { width: 100%; height: 32px; margin-top: 4px; }
 
 /* ── Image gallery ──────────────────────────────────────────────── */
 .gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px; margin-top: 12px;
 }
 .gallery img {
-  width: 100%;
-  border-radius: 8px;
+  width: 100%; border-radius: 8px;
   border: 1px solid var(--border);
-  aspect-ratio: 9/16;
-  object-fit: cover;
+  aspect-ratio: 9/16; object-fit: cover;
 }
 
 /* ── Video player ───────────────────────────────────────────────── */
-.video-wrap {
-  margin-top: 14px;
-  text-align: center;
-}
+.video-wrap { margin-top: 12px; text-align: center; }
 .video-wrap video {
-  max-width: 360px;
-  width: 100%;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  max-width: 100%; width: 100%;
+  border-radius: 10px; border: 1px solid var(--border);
 }
 
 /* ── Status toast ───────────────────────────────────────────────── */
 #toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 10px 24px;
-  border-radius: 10px;
-  font-size: 0.85rem;
+  position: fixed; bottom: 16px; left: 12px; right: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 10px 16px; border-radius: 10px;
+  font-size: 0.82rem; text-align: center;
   box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-  opacity: 0;
-  transition: opacity 0.3s;
-  pointer-events: none;
-  z-index: 100;
+  opacity: 0; transition: opacity 0.3s;
+  pointer-events: none; z-index: 100;
+  transform: none;
 }
 #toast.visible { opacity: 1; }
 #toast.error { border-color: var(--accent); color: var(--accent); }
 
 /* ── Misc ───────────────────────────────────────────────────────── */
-.mt-sm { margin-top: 10px; }
-.text-muted { color: var(--muted); font-size: 0.85rem; }
-.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+.mt-sm { margin-top: 8px; }
+.text-muted { color: var(--muted); font-size: 0.82rem; }
+label.text-muted { display: block; margin-top: 10px; }
+.spinner {
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Activity log ───────────────────────────────────────────────── */
+.log-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.log-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; cursor: pointer; user-select: none;
+  font-size: 0.8rem; font-weight: 600; color: var(--muted);
+}
+.log-header .log-title { flex: 1; }
+.log-header .log-chevron { font-size: 0.7rem; transition: transform 0.2s; }
+.log-header.collapsed .log-chevron { transform: rotate(-90deg); }
+.log-body {
+  max-height: 180px; overflow-y: auto;
+  padding: 0 14px 10px;
+  border-top: 1px solid var(--border);
+}
+.log-body.hidden { display: none; }
+.log-entry {
+  display: grid;
+  grid-template-columns: 58px 50px 1fr;
+  gap: 6px; align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.76rem;
+}
+.log-entry:last-child { border-bottom: none; }
+.log-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.log-step-lbl { color: var(--accent2); font-weight: 600; }
+.log-msg { color: var(--text); }
+.log-entry.is-error .log-msg { color: var(--accent); }
+.log-entry.is-done .log-msg { color: var(--green); }
+
+/* ══════════════════════════════════════════════════════════════════
+   Desktop (≥ 640px)
+   ══════════════════════════════════════════════════════════════════ */
+@media (min-width: 640px) {
+  .app { padding: 32px 24px 80px; }
+  header { margin-bottom: 36px; }
+  header h1 { font-size: 1.8rem; }
+  header p { font-size: 0.95rem; }
+
+  .top-bar { flex-direction: row; align-items: center; gap: 12px; }
+  .top-bar .row { flex: 0 0 auto; }
+  .top-bar select { min-width: 180px; max-width: 280px; }
+  .top-bar .spacer { display: block; flex: 1; }
+
+  .stepper { margin-bottom: 36px; }
+
+  .card { padding: 28px; margin-bottom: 20px; }
+  .card-header .num { width: 32px; height: 32px; font-size: 0.85rem; }
+  .card-header h2 { font-size: 1.1rem; }
+
+  .btn-row { flex-direction: row; align-items: center; }
+  .btn-row .btn { width: auto; }
+
+  .option-row { flex-direction: row; align-items: center; }
+  .option-row select { width: auto; max-width: 180px; }
+
+  textarea { min-height: 200px; }
+
+  .segment-list li { flex-wrap: nowrap; }
+  .segment-list audio { width: auto; height: 32px; margin-top: 0; }
+
+  .gallery { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+
+  .video-wrap video { max-width: 360px; }
+
+  #toast {
+    left: 50%; right: auto; transform: translateX(-50%);
+    max-width: 480px;
+  }
+}
 </style>
 </head>
 <body>
@@ -273,9 +312,24 @@ textarea {
 
   <!-- Header -->
   <header>
-    <h1>Hunger Games &mdash; Video Pipeline</h1>
+    <h1 id="page-title">Video Pipeline</h1>
     <p>RAG search &rarr; Script &rarr; Audio &rarr; Images &rarr; Final video</p>
   </header>
+
+  <!-- Top bar: wiki selector + actions -->
+  <div class="top-bar">
+    <div class="row" style="flex:1;min-width:0">
+      <select id="wiki-select" onchange="switchWiki(this.value)">
+        <option value="">-- Select a wiki --</option>
+      </select>
+    </div>
+    <div class="row">
+      <button class="btn btn-secondary btn-sm" id="btn-new-session" onclick="newSessionConfirm(this)">New Session</button>
+      <button class="btn btn-secondary btn-sm" id="btn-restart" onclick="restartServer(this)">Restart</button>
+      <span class="spacer"></span>
+      <a href="/scrape">+ Add Wiki</a>
+    </div>
+  </div>
 
   <!-- Stepper dots -->
   <div class="stepper">
@@ -283,6 +337,17 @@ textarea {
     <div class="step-dot" id="dot-2"></div>
     <div class="step-dot" id="dot-3"></div>
     <div class="step-dot" id="dot-4"></div>
+    <div class="step-dot" id="dot-5"></div>
+  </div>
+
+  <!-- Activity log -->
+  <div class="log-panel" id="log-panel" style="display:none">
+    <div class="log-header" id="log-header" onclick="toggleLog()">
+      <span class="spinner" id="log-spinner" style="display:none"></span>
+      <span class="log-title" id="log-title">Activity Log</span>
+      <span class="log-chevron">▾</span>
+    </div>
+    <div class="log-body" id="log-body"></div>
   </div>
 
   <!-- ────────────────────────── Step 1: Script ──────────────────────── -->
@@ -293,19 +358,36 @@ textarea {
       <span class="badge" id="badge-1"></span>
     </div>
 
-    <input type="text" id="topic-input" placeholder="Enter a topic, e.g. Finnick Odair, The 74th Hunger Games…">
+    <input type="text" id="topic-input" placeholder="Enter a topic…">
+
+    <div class="option-row">
+      <label>Language</label>
+      <select id="lang-select">
+        <option value="es-MX">Español (MX)</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <div class="option-row">
+      <label>Mode</label>
+      <select id="mode-select">
+        <option value="factual">Factual</option>
+        <option value="theory">Theory / Speculation</option>
+      </select>
+    </div>
 
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-search" onclick="generateScript()">
         Search &amp; Generate
       </button>
-      <div class="progress-wrap" id="prog-1">
-        <div class="progress-bar-bg"><div class="progress-bar" id="pbar-1"></div></div>
-        <div class="progress-text" id="ptxt-1"></div>
-      </div>
     </div>
 
-    <div id="script-area" style="display:none; margin-top:18px;">
+    <div class="progress-wrap" id="prog-1">
+      <div class="progress-bar-bg"><div class="progress-bar" id="pbar-1"></div></div>
+      <div class="progress-text" id="ptxt-1"></div>
+    </div>
+
+    <div id="script-area" style="display:none; margin-top:14px;">
       <label class="text-muted">Edit the script below, then proceed.</label>
       <textarea id="script-editor" class="mt-sm"></textarea>
       <div class="btn-row">
@@ -332,10 +414,12 @@ textarea {
 
     <ul class="segment-list" id="audio-segments"></ul>
 
-    <div class="btn-row" id="audio-actions" style="display:none">
-      <button class="btn btn-primary" id="btn-to-images" onclick="generateImages()">
-        Generate Images &rarr;
-      </button>
+    <div id="audio-actions" style="display:none">
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="generateImages()">
+          Generate Images &rarr;
+        </button>
+      </div>
     </div>
   </div>
 
@@ -347,6 +431,15 @@ textarea {
       <span class="badge" id="badge-3"></span>
     </div>
 
+    <div class="option-row">
+      <label>Images per segment</label>
+      <select id="ips-select">
+        <option value="1">1</option>
+        <option value="2" selected>2</option>
+        <option value="3">3</option>
+      </select>
+    </div>
+
     <div class="progress-wrap" id="prog-3">
       <div class="progress-bar-bg"><div class="progress-bar" id="pbar-3"></div></div>
       <div class="progress-text" id="ptxt-3"></div>
@@ -354,18 +447,22 @@ textarea {
 
     <div class="gallery" id="image-gallery"></div>
 
-    <div class="btn-row" id="image-actions" style="display:none">
-      <label class="text-muted" style="margin-right:8px">Encoder:</label>
-      <select id="encoder-select" style="width:auto;max-width:160px">
-        <option value="auto">Auto-detect</option>
-        <option value="nvenc">NVIDIA (NVENC)</option>
-        <option value="amf">AMD (AMF)</option>
-        <option value="qsv">Intel (QSV)</option>
-        <option value="cpu">CPU (libx264)</option>
-      </select>
-      <button class="btn btn-primary" onclick="stitchVideo()">
-        Build Video &rarr;
-      </button>
+    <div id="image-actions" style="display:none">
+      <div class="option-row">
+        <label>Encoder</label>
+        <select id="encoder-select">
+          <option value="auto">Auto-detect</option>
+          <option value="nvenc">NVIDIA (NVENC)</option>
+          <option value="amf">AMD (AMF)</option>
+          <option value="qsv">Intel (QSV)</option>
+          <option value="cpu">CPU (libx264)</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="stitchVideo()">
+          Build Video &rarr;
+        </button>
+      </div>
     </div>
   </div>
 
@@ -383,10 +480,69 @@ textarea {
     </div>
 
     <div class="video-wrap" id="video-result" style="display:none">
-      <video id="final-video" controls></video>
-      <div class="btn-row" style="justify-content:center; margin-top:12px">
+      <video id="final-video" controls playsinline></video>
+      <div class="btn-row">
         <a class="btn btn-secondary" id="download-link" download="final.mp4">Download MP4</a>
       </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────── Step 5: YouTube Upload ──────────── -->
+  <div class="card locked" id="card-5">
+    <div class="card-header">
+      <div class="num" id="num-5">5</div>
+      <h2>Publish to YouTube</h2>
+      <span class="badge" id="badge-5"></span>
+    </div>
+
+    <div id="yt-auth-section">
+      <p class="text-muted" id="yt-auth-status">Checking YouTube authorization…</p>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-yt-auth" onclick="youtubeAuth()" style="display:none">
+          Authorize YouTube
+        </button>
+      </div>
+    </div>
+
+    <div id="yt-upload-form" style="display:none">
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-yt-gen" onclick="generateYouTubeMeta()">
+          Generate Title, Description &amp; Tags
+        </button>
+      </div>
+
+      <label class="text-muted">Title</label>
+      <input type="text" id="yt-title" placeholder="Video title">
+
+      <label class="text-muted">Description</label>
+      <textarea id="yt-description" style="min-height:100px" placeholder="Video description"></textarea>
+
+      <label class="text-muted">Tags (comma-separated)</label>
+      <input type="text" id="yt-tags" placeholder="e.g. hunger games, theory, lore">
+
+      <div class="option-row">
+        <label>Privacy</label>
+        <select id="yt-privacy">
+          <option value="private">Private</option>
+          <option value="unlisted" selected>Unlisted</option>
+          <option value="public">Public</option>
+        </select>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-yt-upload" onclick="youtubeUpload()">
+          Upload to YouTube
+        </button>
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="prog-5">
+      <div class="progress-bar-bg"><div class="progress-bar" id="pbar-5"></div></div>
+      <div class="progress-text" id="ptxt-5"></div>
+    </div>
+
+    <div id="yt-result" class="mt-sm" style="display:none">
+      <p class="text-muted">Published: <a id="yt-link" href="#" target="_blank" style="color:var(--green)"></a></p>
     </div>
   </div>
 
@@ -424,7 +580,7 @@ function hideProgress(step) {
 }
 
 function updateStepper(completedStep) {
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 5; i++) {
     const dot = $('dot-' + i);
     const num = $('num-' + i);
     const card = $('card-' + i);
@@ -451,16 +607,23 @@ function setBadge(step, text, ok) {
 }
 
 async function post(url, body) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body),
-  });
-  return res.json();
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  } catch (err) {
+    toast('Network error: ' + err.message, true);
+    disableButtons(false);
+    return { error: err.message };
+  }
 }
 
 function disableButtons(on) {
   busy = on;
+  $('log-spinner').style.display = on ? 'inline-block' : 'none';
   document.querySelectorAll('.btn').forEach(b => {
     if (on) b.setAttribute('disabled', '');
     else b.removeAttribute('disabled');
@@ -473,66 +636,123 @@ function formatDur(s) {
   return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
 }
 
+/* ── Activity log ────────────────────────────────────────────────── */
+const STEP_LABELS = ['App', 'Script', 'Audio', 'Images', 'Video', 'YouTube'];
+let logOpen = true;
+
+function toggleLog() {
+  logOpen = !logOpen;
+  $('log-body').classList.toggle('hidden', !logOpen);
+  $('log-header').classList.toggle('collapsed', !logOpen);
+}
+
+function addLog(step, msg, type) {
+  $('log-panel').style.display = 'block';
+  const body = $('log-body');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry' + (type ? ' is-' + type : '');
+  const now = new Date().toTimeString().slice(0, 8);
+  entry.innerHTML =
+    `<span class="log-time">${now}</span>` +
+    `<span class="log-step-lbl">${STEP_LABELS[step] || ''}</span>` +
+    `<span class="log-msg">${msg}</span>`;
+  body.appendChild(entry);
+  if (logOpen) body.scrollTop = body.scrollHeight;
+  while (body.children.length > 50) body.removeChild(body.firstChild);
+}
+
 /* ── SSE listener ────────────────────────────────────────────────── */
-const sse = new EventSource('/api/events');
+let sse;
+function connectSSE() {
+  sse = new EventSource('/api/events');
 
-sse.addEventListener('status', e => {
-  const d = JSON.parse(e.data);
-  setProgress(d.step, d.progress ?? -1, d.message);
-});
+  sse.addEventListener('status', e => {
+    const d = JSON.parse(e.data);
+    setProgress(d.step, d.progress ?? -1, d.message);
+    addLog(d.step, d.message);
+  });
 
-sse.addEventListener('script_done', e => {
-  const d = JSON.parse(e.data);
-  $('script-editor').value = d.script;
-  $('script-area').style.display = 'block';
-  hideProgress(1);
-  setBadge(1, 'done', true);
-  updateStepper(1);
-  disableButtons(false);
-  toast('Script generated');
-});
+  sse.addEventListener('script_done', e => {
+    const d = JSON.parse(e.data);
+    $('script-editor').value = d.script;
+    $('script-area').style.display = 'block';
+    hideProgress(1);
+    setBadge(1, 'done', true);
+    updateStepper(1);
+    disableButtons(false);
+    addLog(1, 'Script generated — review and edit before proceeding', 'done');
+    toast('Script generated');
+  });
 
-sse.addEventListener('audio_done', e => {
-  const d = JSON.parse(e.data);
-  renderSegments(d.segments, d.total_duration);
-  hideProgress(2);
-  setBadge(2, formatDur(d.total_duration), true);
-  $('audio-actions').style.display = 'flex';
-  updateStepper(2);
-  disableButtons(false);
-  toast('Audio generated — ' + d.segments.length + ' segments');
-});
+  sse.addEventListener('audio_done', e => {
+    const d = JSON.parse(e.data);
+    renderSegments(d.segments, d.total_duration);
+    hideProgress(2);
+    setBadge(2, formatDur(d.total_duration), true);
+    $('audio-actions').style.display = 'flex';
+    updateStepper(2);
+    disableButtons(false);
+    addLog(2, d.segments.length + ' segments, total ' + formatDur(d.total_duration), 'done');
+    toast('Audio generated — ' + d.segments.length + ' segments');
+  });
 
-sse.addEventListener('images_done', e => {
-  const d = JSON.parse(e.data);
-  renderImages(d.images);
-  hideProgress(3);
-  setBadge(3, d.images.length + ' images', true);
-  $('image-actions').style.display = 'flex';
-  updateStepper(3);
-  disableButtons(false);
-  toast('Images generated');
-});
+  sse.addEventListener('images_done', e => {
+    const d = JSON.parse(e.data);
+    renderImages(d.images);
+    hideProgress(3);
+    setBadge(3, d.images.length + ' images', true);
+    $('image-actions').style.display = 'block';
+    updateStepper(3);
+    disableButtons(false);
+    addLog(3, d.images.length + ' images generated', 'done');
+    toast('Images generated');
+  });
 
-sse.addEventListener('video_done', e => {
-  const d = JSON.parse(e.data);
-  const url = '/output/' + d.video + '?t=' + Date.now();
-  $('final-video').src = url;
-  $('download-link').href = url;
-  $('video-result').style.display = 'block';
-  hideProgress(4);
-  setBadge(4, 'ready', true);
-  updateStepper(4);
-  disableButtons(false);
-  toast('Video ready!');
-});
+  sse.addEventListener('video_done', e => {
+    const d = JSON.parse(e.data);
+    const url = '/output/' + d.video + '?t=' + Date.now();
+    $('final-video').src = url;
+    $('download-link').href = url;
+    $('video-result').style.display = 'block';
+    hideProgress(4);
+    setBadge(4, 'ready', true);
+    updateStepper(4);
+    disableButtons(false);
+    addLog(4, 'Video ready — download or publish to YouTube', 'done');
+    toast('Video ready!');
+  });
 
-sse.addEventListener('error', e => {
-  const d = JSON.parse(e.data);
-  toast(d.message, true);
-  disableButtons(false);
-  for (let i = 1; i <= 4; i++) hideProgress(i);
-});
+  sse.addEventListener('youtube_done', e => {
+    const d = JSON.parse(e.data);
+    $('yt-link').href = d.url;
+    $('yt-link').textContent = d.url;
+    $('yt-result').style.display = 'block';
+    hideProgress(5);
+    setBadge(5, 'published', true);
+    updateStepper(5);
+    disableButtons(false);
+    addLog(5, 'Published: ' + d.url, 'done');
+    toast('Video published to YouTube!');
+  });
+
+  sse.addEventListener('error', e => {
+    try {
+      const d = JSON.parse(e.data);
+      addLog(0, d.message, 'error');
+      toast(d.message, true);
+    } catch (_) {
+      // SSE connection error — reconnect silently
+    }
+    disableButtons(false);
+    for (let i = 1; i <= 5; i++) hideProgress(i);
+  });
+
+  sse.onerror = () => {
+    sse.close();
+    setTimeout(() => { connectSSE(); recoverState(); }, 3000);
+  };
+}
+connectSSE();
 
 /* ── Renderers ───────────────────────────────────────────────────── */
 function renderSegments(segments, totalDur) {
@@ -542,9 +762,9 @@ function renderSegments(segments, totalDur) {
     const li = document.createElement('li');
     li.innerHTML = `
       <span class="idx">${i + 1}</span>
-      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.text}</span>
-      <audio controls preload="none" src="/output/audio/segment_${String(i).padStart(3,'0')}.wav"></audio>
+      <span class="seg-text">${s.text}</span>
       <span class="dur">${s.duration_seconds.toFixed(1)}s</span>
+      <audio controls preload="none" src="/output/audio/segment_${String(i).padStart(3,'0')}.wav"></audio>
     `;
     ul.appendChild(li);
   });
@@ -567,7 +787,10 @@ async function generateScript() {
   if (!topic) return toast('Enter a topic', true);
   disableButtons(true);
   setProgress(1, 0, 'Starting…');
-  const r = await post('/api/generate-script', { topic });
+  addLog(1, 'Starting script generation for "' + topic + '"…');
+  const language = $('lang-select').value;
+  const mode = $('mode-select').value;
+  const r = await post('/api/generate-script', { topic, language, mode });
   if (r.error) { toast(r.error, true); disableButtons(false); }
 }
 
@@ -580,17 +803,20 @@ async function saveScript() {
 }
 
 async function generateAudio() {
-  await saveScript();
   disableButtons(true);
+  await saveScript();
   setProgress(2, 0, 'Starting TTS…');
+  addLog(2, 'Starting audio generation…');
   const r = await post('/api/generate-audio', {});
   if (r.error) { toast(r.error, true); disableButtons(false); }
 }
 
 async function generateImages() {
+  const images_per_segment = parseInt($('ips-select').value) || 1;
   disableButtons(true);
   setProgress(3, 0, 'Starting image generation…');
-  const r = await post('/api/generate-images', {});
+  addLog(3, 'Starting image generation (' + images_per_segment + ' per segment)…');
+  const r = await post('/api/generate-images', { images_per_segment });
   if (r.error) { toast(r.error, true); disableButtons(false); }
 }
 
@@ -598,39 +824,195 @@ async function stitchVideo() {
   const encoder = $('encoder-select').value;
   disableButtons(true);
   setProgress(4, 0, 'Starting…');
+  addLog(4, 'Building video with encoder: ' + encoder + '…');
   const r = await post('/api/stitch-video', { encoder });
   if (r.error) { toast(r.error, true); disableButtons(false); }
 }
 
+/* ── Wiki selector ───────────────────────────────────────────────── */
+async function loadWikis() {
+  try {
+    const res = await (await fetch('/api/wikis')).json();
+    const sel = $('wiki-select');
+    sel.innerHTML = '<option value="">-- Select a wiki --</option>';
+    (res.wikis || []).forEach(w => {
+      const opt = document.createElement('option');
+      opt.value = w.slug;
+      opt.textContent = w.name;
+      if (w.slug === res.active) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    updateTitle(res.active, res.wikis || []);
+  } catch (_) {}
+}
+
+function updateTitle(activeSlug, wikis) {
+  if (activeSlug) {
+    const w = wikis.find(x => x.slug === activeSlug);
+    $('page-title').textContent = (w ? w.name : activeSlug) + ' — Video Pipeline';
+    document.title = (w ? w.name : activeSlug) + ' — Video Pipeline';
+  } else {
+    $('page-title').textContent = 'Video Pipeline';
+    document.title = 'Video Pipeline';
+  }
+}
+
+async function switchWiki(slug) {
+  if (!slug) return;
+  disableButtons(true);
+  const r = await post('/api/set-wiki', { slug });
+  if (r.error) { toast(r.error, true); disableButtons(false); return; }
+  toast('Switched wiki');
+  location.reload();
+}
+
+function newSessionConfirm(btn) {
+  if (btn.dataset.confirming) {
+    newSession();
+  } else {
+    btn.dataset.confirming = '1';
+    btn.textContent = 'Sure?';
+    btn.classList.add('btn-primary');
+    btn.classList.remove('btn-secondary');
+    clearTimeout(btn._ct);
+    btn._ct = setTimeout(() => {
+      delete btn.dataset.confirming;
+      btn.textContent = 'New Session';
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-secondary');
+    }, 3000);
+  }
+}
+
+async function newSession() {
+  const r = await post('/api/reset-session', {});
+  if (r.ok) location.reload();
+  else toast(r.error, true);
+}
+
+async function restartServer(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Restarting…';
+  try {
+    const r = await post('/api/restart', {});
+    if (r.error) { toast(r.error, true); btn.disabled = false; btn.textContent = 'Restart'; return; }
+  } catch (_) {}
+
+  // Poll until the server is back up, then reload
+  const poll = setInterval(async () => {
+    try {
+      await fetch('/api/state');
+      clearInterval(poll);
+      location.reload();
+    } catch (_) {}
+  }, 800);
+}
+
 /* ── Page-load recovery ──────────────────────────────────────────── */
 async function recoverState() {
-  const s = await (await fetch('/api/state')).json();
-  if (s.step >= 1 && s.script) {
-    $('topic-input').value = s.topic;
-    $('script-editor').value = s.script;
-    $('script-area').style.display = 'block';
-    setBadge(1, 'done', true);
-  }
-  if (s.step >= 2 && s.segments.length) {
-    renderSegments(s.segments, s.total_duration);
-    setBadge(2, formatDur(s.total_duration), true);
-    $('audio-actions').style.display = 'flex';
-  }
-  if (s.step >= 3 && s.images.length) {
-    renderImages(s.images);
-    setBadge(3, s.images.length + ' images', true);
-    $('image-actions').style.display = 'flex';
-  }
-  if (s.has_video) {
-    const url = '/output/video/final.mp4?t=' + Date.now();
-    $('final-video').src = url;
-    $('download-link').href = url;
-    $('video-result').style.display = 'block';
-    setBadge(4, 'ready', true);
-  }
-  updateStepper(s.step);
+  await loadWikis();
+  try {
+    const s = await (await fetch('/api/state')).json();
+    if (s.step >= 1 && s.script) {
+      $('topic-input').value = s.topic;
+      $('script-editor').value = s.script;
+      $('script-area').style.display = 'block';
+      setBadge(1, 'done', true);
+    }
+    if (s.step >= 2 && s.segments.length) {
+      renderSegments(s.segments, s.total_duration);
+      setBadge(2, formatDur(s.total_duration), true);
+      $('audio-actions').style.display = 'flex';
+    }
+    if (s.step >= 3 && s.images.length) {
+      renderImages(s.images);
+      setBadge(3, s.images.length + ' images', true);
+      $('image-actions').style.display = 'block';
+    }
+    if (s.has_video) {
+      const url = '/output/video/final.mp4?t=' + Date.now();
+      $('final-video').src = url;
+      $('download-link').href = url;
+      $('video-result').style.display = 'block';
+      setBadge(4, 'ready', true);
+      $('card-5').classList.remove('locked');
+    }
+    updateStepper(s.step);
+    updateYouTubeAuthUI(s.youtube_authenticated, s.has_client_secrets);
+  } catch (_) {}
 }
 recoverState();
+
+/* ── YouTube ─────────────────────────────────────────────────── */
+function updateYouTubeAuthUI(authenticated, hasSecrets) {
+  if (!hasSecrets) {
+    $('yt-auth-status').textContent = 'Place client_secrets.json in the project root to enable YouTube upload.';
+    $('btn-yt-auth').style.display = 'none';
+    $('yt-upload-form').style.display = 'none';
+    return;
+  }
+  if (authenticated) {
+    $('yt-auth-status').textContent = 'YouTube authorized.';
+    $('btn-yt-auth').style.display = 'none';
+    $('yt-upload-form').style.display = 'block';
+  } else {
+    $('yt-auth-status').textContent = 'Not authorized yet.';
+    $('btn-yt-auth').style.display = 'inline-flex';
+    $('yt-upload-form').style.display = 'none';
+  }
+}
+
+async function generateYouTubeMeta() {
+  $('btn-yt-gen').setAttribute('disabled', '');
+  $('btn-yt-gen').textContent = 'Generating…';
+  try {
+    const res = await fetch('/api/youtube/generate-metadata', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: '{}',
+    });
+    const data = await res.json();
+    if (data.error) { toast(data.error, true); return; }
+    if (data.title) $('yt-title').value = data.title;
+    if (data.description) $('yt-description').value = data.description;
+    if (data.tags) $('yt-tags').value = data.tags.join(', ');
+    toast('Metadata generated');
+  } catch (err) {
+    toast('Error: ' + err.message, true);
+  } finally {
+    $('btn-yt-gen').removeAttribute('disabled');
+    $('btn-yt-gen').innerHTML = 'Generate Title, Description &amp; Tags';
+  }
+}
+
+async function youtubeAuth() {
+  try {
+    const r = await (await fetch('/api/youtube/auth')).json();
+    if (r.error) return toast(r.error, true);
+    const popup = window.open(r.url, 'yt_auth', 'width=600,height=700');
+    window.addEventListener('message', function handler(e) {
+      if (e.data === 'youtube_auth_ok') {
+        window.removeEventListener('message', handler);
+        updateYouTubeAuthUI(true, true);
+        toast('YouTube authorized');
+      }
+    });
+  } catch (err) {
+    toast('Auth error: ' + err.message, true);
+  }
+}
+
+async function youtubeUpload() {
+  const title = $('yt-title').value.trim();
+  if (!title) return toast('Title is required', true);
+  const description = $('yt-description').value.trim();
+  const tags = $('yt-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const privacy = $('yt-privacy').value;
+  disableButtons(true);
+  setProgress(5, 0, 'Starting upload…');
+  const r = await post('/api/youtube/upload', { title, description, tags, privacy });
+  if (r.error) { toast(r.error, true); disableButtons(false); }
+}
 
 /* Submit on Enter in topic input */
 $('topic-input').addEventListener('keydown', e => {

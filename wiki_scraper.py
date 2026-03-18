@@ -133,11 +133,18 @@ class WikiScraper:
 
         return results
 
-    async def scrape(self, force: bool = False) -> list[Path]:
-        """Scrape all pages in bulk, returning paths to cached JSON files."""
-        async with httpx.AsyncClient(timeout=60) as client:
+    async def scrape(self, force: bool = False, on_progress=None) -> list[Path]:
+        """Scrape all pages in bulk, returning paths to cached JSON files.
+
+        Args:
+            on_progress: optional callback(fetched, total, message) for UI updates.
+        """
+        async with httpx.AsyncClient(timeout=180) as client:
             total = await self.get_total_pages(client)
             logger.info("Wiki reports %d articles", total)
+
+            if on_progress:
+                on_progress(0, total, f"Enumerating pages ({total} reported)...")
 
             all_pages = await self.enumerate_pages(client)
             logger.info("Enumerated %d page titles", len(all_pages))
@@ -157,11 +164,19 @@ class WikiScraper:
 
             if not to_fetch:
                 logger.info("All pages already cached")
+                if on_progress:
+                    on_progress(len(saved), len(saved), "All pages already cached")
                 return saved
 
+            total_to_fetch = len(to_fetch)
+            if on_progress:
+                on_progress(len(saved), len(saved) + total_to_fetch,
+                            f"Fetching {total_to_fetch} pages ({len(saved)} cached)...")
+
             # Fetch in bulk batches
-            pbar = tqdm(total=len(to_fetch), desc="Scraping pages")
-            for i in range(0, len(to_fetch), BULK_SIZE):
+            pbar = tqdm(total=total_to_fetch, desc="Scraping pages")
+            fetched = 0
+            for i in range(0, total_to_fetch, BULK_SIZE):
                 batch_titles = to_fetch[i:i + BULK_SIZE]
                 try:
                     results = await self.fetch_bulk_content(client, batch_titles)
@@ -175,7 +190,11 @@ class WikiScraper:
                 except Exception:
                     logger.exception("Failed to fetch batch starting with '%s'", batch_titles[0])
 
+                fetched += len(batch_titles)
                 pbar.update(len(batch_titles))
+                if on_progress:
+                    on_progress(len(saved), len(saved) + total_to_fetch - fetched,
+                                f"Fetched {fetched}/{total_to_fetch} pages...")
                 await asyncio.sleep(self.delay)
 
             pbar.close()
@@ -183,6 +202,6 @@ class WikiScraper:
             return saved
 
 
-async def run_scraper(cfg: Config, force: bool = False) -> list[Path]:
+async def run_scraper(cfg: Config, force: bool = False, on_progress=None) -> list[Path]:
     scraper = WikiScraper(cfg)
-    return await scraper.scrape(force=force)
+    return await scraper.scrape(force=force, on_progress=on_progress)

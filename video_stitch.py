@@ -1,14 +1,14 @@
 """Video assembly — stitches images + audio into a short-form video.
 
 Uses FFmpeg directly (no moviepy frame loop) for maximum speed:
-  - zoompan filter  → Ken Burns effect in native C
-  - h264_nvenc/amf/qsv → GPU-accelerated encoding
-  - concat demuxer  → lossless segment join (stream copy)
+  - zoompan filter  -- Ken Burns effect in native C
+  - h264_nvenc/amf/qsv -- GPU-accelerated encoding
+  - concat demuxer  -- lossless segment join (stream copy)
 
 Pipeline:
   1. Load segments.json (from tts.py)
-  2. Per segment: FFmpeg  image + audio → temp MP4  (Ken Burns + fade + GPU encode)
-  3. FFmpeg concat demuxer → final.mp4  (stream copy, no re-encode)
+  2. Per segment: FFmpeg  image + audio -> temp MP4  (Ken Burns + fade + GPU encode)
+  3. FFmpeg concat demuxer -> final.mp4  (stream copy, no re-encode)
 
 Usage:
     python video_stitch.py                     # auto-detect hardware encoder
@@ -20,18 +20,20 @@ Usage:
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from subtitles import generate_subtitles
-
-OUTPUT_WIDTH  = 1080
-OUTPUT_HEIGHT = 1920
-FPS           = 30
-FADE          = 0.4   # fade-in / fade-out duration per segment (seconds)
-
-EFFECTS = ["zoom_in", "zoom_out", "pan_right", "pan_left"]
+from subtitles import generate_subtitles_from_full_wav
+from pipeline_config import (
+    VIDEO_WIDTH as OUTPUT_WIDTH,
+    VIDEO_HEIGHT as OUTPUT_HEIGHT,
+    VIDEO_FPS as FPS,
+    VIDEO_FADE as FADE,
+    VIDEO_EFFECTS as EFFECTS,
+    VIDEO_PAN_FACTOR,
+)
 
 ENCODERS = {
     "nvenc": ["-c:v", "h264_nvenc", "-preset", "p4",       "-cq",      "23"],
@@ -69,48 +71,53 @@ def detect_encoder() -> str:
 def _ken_burns_filter(effect: str, duration: float) -> str:
     """Build an FFmpeg filter string for a smooth Ken Burns effect.
 
-    Rules:
-      - crop w/h are STATIC (evaluated once at init) — cannot use `t`.
-      - crop x/y and scale w/h with eval=frame DO support `t`.
+    Zoom effects use scale:eval=frame for per-frame interpolation, then
+    a static centered crop.
 
-    Zoom effects: normalize to output size, then use scale:eval=frame to
-    grow/shrink the image per-frame, then static crop centers it.
-
-    Pan effects: pre-scale to 1.1×, then crop with a time-varying x.
+    Pan effects use the zoompan filter which provides sub-pixel
+    interpolation — the crop filter rounds to integer pixels and causes
+    visible jitter on slow pans.
     """
     d = max(duration, 0.001)
     W, H = OUTPUT_WIDTH, OUTPUT_HEIGHT
-    # Even-dimension 1.1× size for panning
-    PW = (int(W * 1.1) // 2) * 2   # 1188
-    PH = (int(H * 1.1) // 2) * 2   # 2112
     fade_out = max(0.0, duration - FADE)
 
     if effect == "zoom_in":
-        # Image grows over time → same fixed crop shows less → zoom-in feel
-        # Clamp scale to max 1.15× so late frames don't over-zoom
         filters = [
             f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}",
             f"scale=w='iw*min(1+0.15*t/{d:.4f},1.15)':h='ih*min(1+0.15*t/{d:.4f},1.15)':eval=frame",
             f"crop={W}:{H}:x='(in_w-{W})/2':y='(in_h-{H})/2'",
         ]
     elif effect == "zoom_out":
-        # Image shrinks over time → zoom-out feel
-        # Clamp scale to min 1.0× so the image never goes smaller than output
         filters = [
             f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}",
             f"scale=w='iw*max(1.15-0.15*t/{d:.4f},1.0)':h='ih*max(1.15-0.15*t/{d:.4f},1.0)':eval=frame",
             f"crop={W}:{H}:x='(in_w-{W})/2':y='(in_h-{H})/2'",
         ]
-    elif effect == "pan_right":
-        # Static scale to 1.1×, crop x moves left→right — clamp to valid range
+    elif effect in ("pan_right", "pan_left"):
+        # Pre-scale then use zoompan for smooth sub-pixel panning.
+        # zoompan with d=1 processes one input frame → one output frame,
+        # using 'in' (input frame counter) for time progression.
+        PAN_FACTOR = VIDEO_PAN_FACTOR
+        PW = (int(W * PAN_FACTOR) // 2) * 2
+        PH = (int(H * PAN_FACTOR) // 2) * 2
+        total_frames = max(int(d * FPS), 1)
+        z = PW / W  # zoom so visible window = W×H
+        travel_x = PW - W
+        center_y = (PH - H) // 2
+
+        if effect == "pan_right":
+            x_expr = f"min({travel_x}*in/{total_frames},{travel_x})"
+        else:
+            x_expr = f"max({travel_x}-{travel_x}*in/{total_frames},0)"
+
         filters = [
             f"scale={PW}:{PH}:force_original_aspect_ratio=increase,crop={PW}:{PH}",
-            f"crop={W}:{H}:x='min((in_w-{W})*t/{d:.4f},in_w-{W})':y='(in_h-{H})/2'",
+            f"zoompan=z='{z:.4f}':x='{x_expr}':y='{center_y}':d=1:s={W}x{H}:fps={FPS}",
         ]
-    else:  # pan_left
+    else:
         filters = [
-            f"scale={PW}:{PH}:force_original_aspect_ratio=increase,crop={PW}:{PH}",
-            f"crop={W}:{H}:x='max((in_w-{W})*(1-t/{d:.4f}),0)':y='(in_h-{H})/2'",
+            f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}",
         ]
 
     filters += [
@@ -137,33 +144,34 @@ def _ffmpeg_filter_path(p: Path) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Per-segment encode
+# Per-segment encode (video-only — no audio track)
 # ---------------------------------------------------------------------------
 
 def _encode_segment(
     image_path: Path,
-    audio_path: Path,
     output_path: Path,
     duration: float,
     effect: str,
     encoder: str,
     ass_path: Path | None = None,
 ) -> None:
+    """Encode one image as a video-only MP4 (no audio).
+
+    Audio is added in a single pass at the end by _concat_video_mux_audio,
+    which avoids per-segment AAC encoder-delay artifacts at transitions.
+    """
     vf = _ken_burns_filter(effect, duration)
 
-    # Burn subtitles if an ASS file is provided
     if ass_path and ass_path.exists():
         escaped = _ffmpeg_filter_path(ass_path)
-        # Insert the ass filter just before format=yuv420p
         vf = vf.replace(",format=yuv420p", f",ass='{escaped}',format=yuv420p")
 
     cmd = [
         "ffmpeg", "-y",
         "-loop", "1", "-framerate", str(FPS), "-i", str(image_path),
-        "-i", str(audio_path),
         "-filter:v", vf,
         *ENCODERS[encoder],
-        "-c:a", "aac", "-b:a", "192k",
+        "-an",            # no audio track
         "-t", str(duration),
         "-movflags", "+faststart",
         str(output_path),
@@ -176,10 +184,18 @@ def _encode_segment(
 
 
 # ---------------------------------------------------------------------------
-# Concat
+# Concat video segments + mux full audio in one pass
 # ---------------------------------------------------------------------------
 
-def _concat_segments(segment_paths: list[Path], output_path: Path) -> None:
+def _concat_video_mux_audio(
+    segment_paths: list[Path], audio_path: Path, output_path: Path
+) -> None:
+    """Concat video-only segments and mux the continuous audio track.
+
+    Encoding AAC once across the full audio avoids the encoder-delay
+    glitches that occur when independently-encoded AAC segments are
+    stream-copied together.
+    """
     list_file = output_path.parent / "concat_list.txt"
     list_file.write_text(
         "\n".join(f"file '{p.absolute().as_posix()}'" for p in segment_paths),
@@ -189,7 +205,11 @@ def _concat_segments(segment_paths: list[Path], output_path: Path) -> None:
     cmd = [
         "ffmpeg", "-y",
         "-f", "concat", "-safe", "0", "-i", str(list_file),
-        "-c", "copy",
+        "-i", str(audio_path),
+        "-c:v", "copy",
+        "-c:a", "aac", "-b:a", "192k",
+        "-shortest",
+        "-movflags", "+faststart",
         str(output_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -197,7 +217,7 @@ def _concat_segments(segment_paths: list[Path], output_path: Path) -> None:
 
     if result.returncode != 0:
         print(result.stderr[-2000:])
-        raise RuntimeError("FFmpeg concat failed")
+        raise RuntimeError("FFmpeg concat+mux failed")
 
 
 # ---------------------------------------------------------------------------
@@ -210,49 +230,77 @@ def stitch_video(
     output_path: Path,
     encoder: str = "auto",
     on_progress=None,
+    visual_segments: list[dict] = None,  # kept for API compatibility, not used
+    language: str = None,
 ) -> Path:
     if encoder == "auto":
         encoder = detect_encoder()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Clean up any leftover temp dir from a previous failed run
     temp_dir = output_path.parent / "_segments_tmp"
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir, ignore_errors=True)
     temp_dir.mkdir(exist_ok=True)
+    # Remove old output so FFmpeg doesn't complain
+    if output_path.exists():
+        output_path.unlink()
 
-    # --- Generate word-level subtitles ---
+    # --- Locate the continuous audio file produced by tts.py ---
+    full_audio = Path(segments[0]["audio_path"]).parent / "full_audio.wav"
+    if not full_audio.exists():
+        raise FileNotFoundError(f"full_audio.wav not found at {full_audio}")
+
+    from tts import wav_duration
+    total_audio_duration = wav_duration(full_audio)
+
+    # --- Count available images to compute uniform duration per image ---
+    image_files = sorted(images_dir.glob("image_*.png"))
+    num_images = len(image_files)
+    if num_images == 0:
+        raise RuntimeError(f"No image_*.png files found in {images_dir}")
+
+    image_duration = total_audio_duration / num_images
+    print(f"Full audio: {total_audio_duration:.2f}s / {num_images} images = {image_duration:.3f}s per image")
+
+    # --- Generate subtitles from the full audio (one transcription pass) ---
     subs_dir = output_path.parent.parent / "subtitles"
-    print("Generating word-level subtitles…")
-    ass_paths = generate_subtitles(segments, subs_dir)
+    whisper_lang = language.split("-")[0] if language else None
+    full_text = " ".join(seg["text"] for seg in segments)
+    print(f"Generating word-level subtitles from full audio (lang={whisper_lang or 'auto'})…")
+    ass_paths = generate_subtitles_from_full_wav(
+        full_wav=full_audio,
+        output_dir=subs_dir,
+        num_segments=num_images,
+        segment_duration=image_duration,
+        full_text=full_text,
+        language=whisper_lang,
+    )
 
-    # --- Encode each segment ---
+    # --- Encode each image as video-only (no audio) ---
     segment_paths = []
+    total = num_images
 
-    for i, seg in enumerate(segments):
+    for i, image_path in enumerate(image_files):
         if on_progress:
-            on_progress(i, len(segments), seg["text"])
+            on_progress(i, total, f"image {i+1}/{total}")
 
-        image_path = images_dir / f"image_{i:03d}.png"
-        audio_path = Path(seg["audio_path"])
-        duration   = seg["duration_seconds"]
-        effect     = EFFECTS[i % len(EFFECTS)]
+        effect = EFFECTS[i % len(EFFECTS)]
+        ass_path = ass_paths[i] if i < len(ass_paths) else None
 
-        print(f"  [{i+1}/{len(segments)}] {effect.replace('_',' ')}  "
-              f"{duration:.1f}s — {seg['text'][:55]}…")
+        print(f"  [{i+1}/{total}] {effect.replace('_', ' ')}  {image_duration:.2f}s")
 
         seg_out = temp_dir / f"seg_{i:03d}.mp4"
-        _encode_segment(
-            image_path, audio_path, seg_out, duration, effect, encoder,
-            ass_path=ass_paths[i],
-        )
+        _encode_segment(image_path, seg_out, image_duration, effect, encoder,
+                        ass_path=ass_path)
         segment_paths.append(seg_out)
 
-    print(f"\nJoining {len(segment_paths)} segments (stream copy)…")
-    _concat_segments(segment_paths, output_path)
+    print(f"\nConcatenating {len(segment_paths)} video segments and muxing audio…")
+    _concat_video_mux_audio(segment_paths, full_audio, output_path)
 
-    for p in segment_paths:
-        p.unlink(missing_ok=True)
-    temp_dir.rmdir()
+    shutil.rmtree(temp_dir, ignore_errors=True)
 
-    print(f"Done → {output_path}")
+    print(f"Done -> {output_path}")
     return output_path
 
 
@@ -289,7 +337,7 @@ def rebuild_segments_json(audio_dir: Path, script_path: Path) -> Path:
     result = {"segments": segments, "total_duration": round(cursor, 3)}
     out = audio_dir / "segments.json"
     out.write_text(json.dumps(result, indent=2), encoding="utf-8")
-    print(f"Saved → {out}  (total {cursor:.1f}s)\n")
+    print(f"Saved -> {out}  (total {cursor:.1f}s)\n")
     return out
 
 

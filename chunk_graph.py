@@ -11,6 +11,17 @@ PARSED_DIR = Path(__file__).parent / "parsed"
 GRAPH_DIR = Path(__file__).parent / "graph"
 
 
+def build_graph_chunk(data: dict) -> dict | None:
+    """Build a graph chunk dict from parsed page data. Returns None if no links."""
+    links = data.get("links", [])
+    if not links:
+        return None
+    return {
+        "node": data["title"],
+        "links": links,
+    }
+
+
 def main():
     GRAPH_DIR.mkdir(parents=True, exist_ok=True)
 

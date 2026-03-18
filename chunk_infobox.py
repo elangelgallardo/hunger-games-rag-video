@@ -44,6 +44,19 @@ def build_content(title: str, infobox: dict) -> str:
     return " ".join(parts)
 
 
+def build_infobox_chunk(data: dict) -> dict | None:
+    """Build an infobox chunk dict from parsed page data. Returns None if no infobox."""
+    infobox = data.get("infobox", {})
+    if not infobox:
+        return None
+    return {
+        "chunk_id": data["page_id"] + "_infobox",
+        "type": "infobox",
+        "content": build_content(data["title"], infobox),
+        "page": data["title"],
+    }
+
+
 def main():
     INFOBOX_DIR.mkdir(parents=True, exist_ok=True)
 

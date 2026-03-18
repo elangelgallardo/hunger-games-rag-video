@@ -11,6 +11,19 @@ PARSED_DIR = Path(__file__).parent / "parsed"
 SUMMARY_DIR = Path(__file__).parent / "summary"
 
 
+def build_summary_chunk(data: dict) -> dict | None:
+    """Build a summary chunk dict from parsed page data. Returns None if no summary."""
+    summary = data.get("summary", "").strip()
+    if not summary:
+        return None
+    return {
+        "chunk_id": data["page_id"] + "_summary",
+        "page_title": data.get("title", ""),
+        "type": "summary",
+        "content": summary,
+    }
+
+
 def main():
     SUMMARY_DIR.mkdir(parents=True, exist_ok=True)
 

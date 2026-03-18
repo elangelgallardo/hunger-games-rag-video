@@ -18,9 +18,11 @@ from pathlib import Path
 
 from faster_whisper import WhisperModel
 
-WHISPER_MODEL = "base"
-WHISPER_DEVICE = "cpu"      # "cuda" for GPU
-WHISPER_COMPUTE = "int8"    # "float16" for GPU
+from pipeline_config import (
+    WHISPER_MODEL,
+    WHISPER_DEVICE,
+    WHISPER_COMPUTE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -36,14 +38,14 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial Black,80,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,0,2,10,10,600,1
+Style: Default,Bebas Neue,120,&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,2,0,1,4,3,5,10,10,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"""
 
 
 def _ass_ts(seconds: float) -> str:
-    """Convert seconds → ASS timestamp  H:MM:SS.cc"""
+    """Convert seconds to ASS timestamp  H:MM:SS.cc"""
     h = int(seconds // 3600)
     m = int((seconds % 3600) // 60)
     s = seconds % 60
@@ -66,13 +68,13 @@ def _get_model():
     return _model
 
 
-def transcribe_words(wav_path: Path) -> list[dict]:
+def transcribe_words(wav_path: Path, language: str = None) -> list[dict]:
     """Return [{word, start, end}, …] for every word in a WAV file."""
     model = _get_model()
     segments, _ = model.transcribe(
         str(wav_path),
         word_timestamps=True,
-        language="en",
+        language=language,
     )
 
     words = []
@@ -95,11 +97,6 @@ def _normalize(word: str) -> str:
     return re.sub(r"[^\w']", "", word.lower())
 
 
-def _strip_punct(word: str) -> str:
-    """Remove leading/trailing punctuation but keep the core word."""
-    return re.sub(r"^[^\w]+|[^\w]+$", "", word)
-
-
 def correct_words(transcribed: list[dict], original_text: str) -> list[dict]:
     """Replace transcribed spellings with the original script's words.
 
@@ -119,14 +116,14 @@ def correct_words(transcribed: list[dict], original_text: str) -> list[dict]:
 
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == "equal":
-            # Perfect match — swap in original spelling (preserves caps)
+            # Perfect match — swap in original spelling (preserves caps & punctuation)
             for ti, oi in zip(range(i1, i2), range(j1, j2)):
-                corrected[ti]["word"] = _strip_punct(orig_words[oi])
+                corrected[ti]["word"] = orig_words[oi]
         elif tag == "replace":
             # Whisper mis-heard — pair them 1:1 as far as possible
             pairs = min(i2 - i1, j2 - j1)
             for k in range(pairs):
-                corrected[i1 + k]["word"] = _strip_punct(orig_words[j1 + k])
+                corrected[i1 + k]["word"] = orig_words[j1 + k]
         # "insert" (extra words in script) → nothing to do
         # "delete" (extra words in transcription) → keep Whisper's word
 
@@ -160,8 +157,12 @@ def generate_subtitles(
     segments: list[dict],
     output_dir: Path,
     on_progress=None,
+    language: str = None,
 ) -> list[Path]:
     """Transcribe all segment WAVs and write per-segment ASS files.
+
+    Args:
+        language: Whisper language code (e.g. "en", "es"). None = auto-detect.
 
     Returns a list of ASS file paths (same order / count as segments).
     """
@@ -177,11 +178,62 @@ def generate_subtitles(
         wav_path = Path(seg["audio_path"])
         ass_path = output_dir / f"segment_{i:03d}.ass"
 
-        words = transcribe_words(wav_path)
+        words = transcribe_words(wav_path, language=language)
         words = correct_words(words, seg["text"])
         generate_ass(words, ass_path)
 
         print(f"  [{i+1}/{len(segments)}] {len(words)} words — {seg['text'][:55]}…")
+        ass_paths.append(ass_path)
+
+    return ass_paths
+
+
+def generate_subtitles_from_full_wav(
+    full_wav: Path,
+    output_dir: Path,
+    num_segments: int,
+    segment_duration: float,
+    full_text: str,
+    language: str = None,
+) -> list[Path]:
+    """Transcribe the full audio once and slice word timestamps into per-segment ASS files.
+
+    Args:
+        full_wav:         Path to the continuous audio file (full_audio.wav).
+        output_dir:       Directory to write segment_NNN.ass files.
+        num_segments:     Number of equal-duration image segments.
+        segment_duration: Duration of each segment in seconds.
+        full_text:        Complete script text used for spell-correction alignment.
+        language:         Whisper language code. None = auto-detect.
+
+    Returns a list of ASS file paths (one per segment).
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _get_model()
+
+    print(f"  Transcribing full audio ({full_wav.name})…")
+    words = transcribe_words(full_wav, language=language)
+    words = correct_words(words, full_text)
+    print(f"  {len(words)} words transcribed, slicing into {num_segments} segments")
+
+    ass_paths: list[Path] = []
+    for i in range(num_segments):
+        seg_start = i * segment_duration
+        seg_end = seg_start + segment_duration
+        ass_path = output_dir / f"segment_{i:03d}.ass"
+
+        seg_words = [
+            {
+                "word": w["word"],
+                "start": max(0.0, w["start"] - seg_start),
+                "end": min(segment_duration, w["end"] - seg_start),
+            }
+            for w in words
+            if w["end"] > seg_start and w["start"] < seg_end
+        ]
+
+        generate_ass(seg_words, ass_path)
+        print(f"  [{i+1}/{num_segments}] {len(seg_words)} words (t={seg_start:.1f}s–{seg_end:.1f}s)")
         ass_paths.append(ass_path)
 
     return ass_paths
@@ -214,11 +266,11 @@ if __name__ == "__main__":
             raw = transcribe_words(wav)
             fixed = correct_words(raw, seg["text"])
             for r, f in zip(raw, fixed):
-                changed = " ✓" if r["word"] != f["word"] else ""
-                print(f"  [{f['start']:6.2f} → {f['end']:6.2f}]  {f['word']:<20s}"
+                changed = " [fixed]" if r["word"] != f["word"] else ""
+                print(f"  [{f['start']:6.2f} -> {f['end']:6.2f}]  {f['word']:<20s}"
                       f"  (was: {r['word']}){changed}" if changed else
-                      f"  [{f['start']:6.2f} → {f['end']:6.2f}]  {f['word']}")
+                      f"  [{f['start']:6.2f} -> {f['end']:6.2f}]  {f['word']}")
     else:
         subs_dir = base / "output" / "subtitles"
         paths = generate_subtitles(segments, subs_dir)
-        print(f"\n{len(paths)} subtitle files → {subs_dir}/")
+        print(f"\n{len(paths)} subtitle files -> {subs_dir}/")

@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrape Wiki — Video Pipeline</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0f1117;
+  --surface:   #1a1d2e;
+  --surface2:  #232738;
+  --border:    #2e3348;
+  --text:      #e4e4e7;
+  --muted:     #8b8fa3;
+  --accent:    #e94560;
+  --green:     #22c55e;
+  --radius:    12px;
+  --font:      'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-text-size-adjust: 100%;
+}
+
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 12px 80px;
+}
+
+header { text-align: center; margin-bottom: 20px; }
+header h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; }
+header p { color: var(--muted); margin-top: 4px; font-size: 0.82rem; }
+
+nav { text-align: center; margin-bottom: 24px; }
+nav a {
+  color: var(--accent); text-decoration: none;
+  font-size: 0.85rem; font-weight: 600;
+}
+nav a:hover { text-decoration: underline; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px; margin-bottom: 14px;
+}
+.card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; }
+
+label {
+  display: block; font-size: 0.82rem;
+  color: var(--muted); margin-bottom: 4px; margin-top: 12px;
+}
+label:first-of-type { margin-top: 0; }
+
+input[type="text"], input[type="number"] {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+input:focus { border-color: var(--accent); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 18px; border: none; border-radius: 8px;
+  font-family: var(--font); font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; transition: background 0.2s, transform 0.1s;
+  width: 100%;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #d6304e; }
+
+.btn-row { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.btn-cancel {
+  background: transparent; color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.btn-cancel:hover { background: var(--accent); color: #fff; }
+
+/* Progress */
+.progress-wrap { margin-top: 14px; display: none; }
+.progress-wrap.visible { display: block; }
+.progress-bar-bg { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 3px; width: 0%; transition: width 0.3s; }
+.progress-text { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+
+/* Log */
+.log {
+  margin-top: 14px; background: var(--surface2);
+  border-radius: 8px; padding: 12px;
+  max-height: 250px; overflow-y: auto;
+  font-size: 0.75rem;
+  font-family: 'Consolas', 'Courier New', monospace;
+  color: var(--muted); display: none;
+  word-break: break-word;
+}
+.log.visible { display: block; }
+.log .line { padding: 2px 0; }
+.log .line.ok { color: var(--green); }
+.log .line.err { color: var(--accent); }
+
+/* Existing wikis */
+.wiki-list { list-style: none; margin-top: 10px; }
+.wiki-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--surface2);
+  border-radius: 8px; margin-bottom: 5px; font-size: 0.85rem;
+}
+.wiki-list li .name { font-weight: 600; }
+.wiki-list li .meta {
+  color: var(--muted); font-size: 0.75rem; margin-left: auto;
+}
+.btn-delete, .btn-confirm-yes, .btn-confirm-no {
+  border-radius: 6px;
+  padding: 4px 10px; font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-delete {
+  background: transparent; border: 1px solid var(--accent);
+  color: var(--accent);
+}
+.btn-delete:hover { background: var(--accent); color: #fff; }
+.btn-confirm-yes {
+  background: var(--accent); border: 1px solid var(--accent); color: #fff;
+}
+.btn-confirm-no {
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+}
+.confirm-row { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.confirm-label { font-size: 0.75rem; color: var(--accent); flex-shrink: 0; }
+
+/* Toast */
+#toast {
+  position: fixed; bottom: 16px; left: 12px; right: 12px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 16px; border-radius: 10px; font-size: 0.82rem; text-align: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100;
+}
+#toast.visible { opacity: 1; }
+#toast.error { border-color: var(--accent); color: var(--accent); }
+
+/* ── Desktop ────────────────────────────────────────────────────── */
+@media (min-width: 640px) {
+  .app { padding: 32px 24px 80px; }
+  header { margin-bottom: 32px; }
+  header h1 { font-size: 1.8rem; }
+  header p { font-size: 0.95rem; }
+  .card { padding: 28px; margin-bottom: 20px; }
+  .card h2 { font-size: 1.1rem; }
+  .btn { width: auto; }
+  .btn-row { flex-direction: row; }
+  .log { max-height: 300px; font-size: 0.82rem; }
+  #toast {
+    left: 50%; right: auto; transform: translateX(-50%);
+    max-width: 480px;
+  }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <h1>Scrape a Wiki</h1>
+    <p>Add a new Fandom wiki to the video pipeline</p>
+  </header>
+
+  <nav style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <a href="/">&larr; Back to Video Pipeline</a>
+    <button class="btn btn-cancel" style="width:auto;padding:6px 14px;font-size:0.82rem" id="btn-restart-scrape" onclick="restartServer(this)">Restart Server</button>
+  </nav>
+
+  <!-- Existing wikis -->
+  <div class="card" id="existing-card" style="display:none">
+    <h2>Existing Wikis</h2>
+    <ul class="wiki-list" id="wiki-list"></ul>
+  </div>
+
+  <!-- Scrape form -->
+  <div class="card">
+    <h2>Add New Wiki</h2>
+
+    <label for="wiki-url">Fandom Wiki URL</label>
+    <input type="text" id="wiki-url" placeholder="https://example.fandom.com">
+
+    <label for="wiki-name">Display Name</label>
+    <input type="text" id="wiki-name" placeholder="e.g. The Hunger Games">
+
+    <label for="max-pages">Max pages (0 = all)</label>
+    <input type="number" id="max-pages" value="0" min="0" step="1">
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-scrape" onclick="startScrape()">
+        Start Scraping
+      </button>
+      <button class="btn btn-cancel" id="btn-cancel" onclick="cancelScrapeConfirm(this)" style="display:none">
+        Cancel / Reset
+      </button>
+    </div>
+
+    <div class="progress-wrap" id="scrape-progress">
+      <div class="progress-bar-bg"><div class="progress-bar" id="scrape-pbar"></div></div>
+      <div class="progress-text" id="scrape-ptxt"></div>
+    </div>
+
+    <div class="log" id="scrape-log"></div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function toast(msg, isError) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'visible' + (isError ? ' error' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = '', 4000);
+}
+
+function addLog(msg, cls) {
+  const log = $('scrape-log');
+  log.classList.add('visible');
+  const div = document.createElement('div');
+  div.className = 'line' + (cls ? ' ' + cls : '');
+  div.textContent = msg;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+/* Load existing wikis */
+async function loadWikis() {
+  try {
+    const res = await (await fetch('/api/wikis')).json();
+    const list = $('wiki-list');
+    list.innerHTML = '';
+    if (res.wikis && res.wikis.length > 0) {
+      $('existing-card').style.display = 'block';
+      res.wikis.forEach(w => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="name">${w.name}</span>
+          <span class="meta">${w.slug}</span>
+          <button class="btn-delete" onclick="confirmDelete(this,'${w.slug}','${w.name}')">Delete</button>
+        `;
+        list.appendChild(li);
+      });
+    } else {
+      $('existing-card').style.display = 'none';
+    }
+  } catch (_) {}
+}
+loadWikis();
+
+function confirmDelete(btn, slug, name) {
+  const li = btn.closest('li');
+  btn.style.display = 'none';
+  const row = document.createElement('div');
+  row.className = 'confirm-row';
+  row.innerHTML =
+    `<span class="confirm-label">Delete?</span>` +
+    `<button class="btn-confirm-yes" onclick="doDeleteWiki(this,'${slug}','${name}')">Yes, delete</button>` +
+    `<button class="btn-confirm-no" onclick="cancelDelete(this)">Cancel</button>`;
+  li.appendChild(row);
+}
+
+function cancelDelete(btn) {
+  const li = btn.closest('li');
+  li.querySelector('.confirm-row').remove();
+  li.querySelector('.btn-delete').style.display = '';
+}
+
+async function doDeleteWiki(btn, slug, name) {
+  btn.setAttribute('disabled', '');
+  try {
+    const res = await fetch('/api/delete-wiki?slug=' + encodeURIComponent(slug), { method: 'POST' });
+    const data = await res.json();
+    if (data.error) { toast(data.error, true); cancelDelete(btn); return; }
+    toast(`"${name}" deleted`);
+    loadWikis();
+  } catch (err) {
+    toast('Network error: ' + err.message, true);
+    cancelDelete(btn);
+  }
+}
+
+/* SSE */
+let sse;
+function connectSSE() {
+  sse = new EventSource('/api/events');
+
+  sse.addEventListener('scrape_status', e => {
+    const d = JSON.parse(e.data);
+    const wrap = $('scrape-progress');
+    wrap.classList.add('visible');
+    if (d.total > 0) {
+      $('scrape-pbar').style.width = Math.round((d.current / d.total) * 100) + '%';
+    }
+    $('scrape-ptxt').textContent = d.message;
+    addLog(d.message);
+  });
+
+  sse.addEventListener('scrape_done', e => {
+    const d = JSON.parse(e.data);
+    addLog(`Done! Wiki "${d.name}" ready (slug: ${d.slug})`, 'ok');
+    $('scrape-pbar').style.width = '100%';
+    $('scrape-ptxt').textContent = 'Complete!';
+    $('btn-scrape').removeAttribute('disabled');
+    $('btn-cancel').style.display = 'none';
+    toast('Wiki scraped successfully!');
+    loadWikis();
+  });
+
+  sse.addEventListener('scrape_error', e => {
+    try {
+      const d = JSON.parse(e.data);
+      addLog('ERROR: ' + d.message, 'err');
+      toast(d.message, true);
+    } catch (_) {}
+    $('btn-scrape').removeAttribute('disabled');
+    $('btn-cancel').style.display = 'none';
+  });
+
+  sse.onerror = () => {
+    sse.close();
+    setTimeout(() => { connectSSE(); checkScrapeState(); }, 3000);
+  };
+}
+connectSSE();
+
+/* Check if a scrape is already running on page load */
+async function checkScrapeState() {
+  try {
+    const s = await (await fetch('/api/scrape-state')).json();
+    if (s.busy) {
+      $('btn-scrape').setAttribute('disabled', '');
+      $('btn-cancel').style.display = '';
+      $('scrape-progress').classList.add('visible');
+      $('scrape-ptxt').textContent = 'Scrape in progress — waiting for updates…';
+      addLog('Reconnected to running scrape. Waiting for updates…');
+    }
+    if (s.error) {
+      addLog('Last error: ' + s.error, 'err');
+    }
+  } catch (_) {}
+}
+checkScrapeState();
+
+function cancelScrapeConfirm(btn) {
+  if (btn.dataset.confirming) {
+    cancelScrape();
+  } else {
+    btn.dataset.confirming = '1';
+    btn.textContent = 'Sure? Tap again';
+    clearTimeout(btn._ct);
+    btn._ct = setTimeout(() => {
+      delete btn.dataset.confirming;
+      btn.textContent = 'Cancel / Reset';
+    }, 3000);
+  }
+}
+
+async function restartServer(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Restarting…';
+  try {
+    await fetch('/api/restart', { method: 'POST' });
+  } catch (_) {}
+  const poll = setInterval(async () => {
+    try {
+      await fetch('/api/state');
+      clearInterval(poll);
+      location.reload();
+    } catch (_) {}
+  }, 800);
+}
+
+async function cancelScrape() {
+  try {
+    await fetch('/api/cancel-scrape', { method: 'POST' });
+    $('btn-scrape').removeAttribute('disabled');
+    $('btn-cancel').style.display = 'none';
+    $('scrape-progress').classList.remove('visible');
+    addLog('Scrape state reset. You can start a new scrape.', 'ok');
+    toast('State reset — form unlocked');
+  } catch (err) {
+    toast('Error: ' + err.message, true);
+  }
+}
+
+/* Start scrape */
+async function startScrape() {
+  const url = $('wiki-url').value.trim();
+  const name = $('wiki-name').value.trim();
+  const max_pages = parseInt($('max-pages').value) || 0;
+
+  if (!url) return toast('Enter a wiki URL', true);
+  if (!name) return toast('Enter a display name', true);
+
+  $('btn-scrape').setAttribute('disabled', '');
+  $('btn-cancel').style.display = '';
+  $('scrape-log').innerHTML = '';
+  $('scrape-log').classList.remove('visible');
+  $('scrape-pbar').style.width = '0%';
+
+  addLog(`Starting scrape: ${name} (${url})...`);
+
+  try {
+    const res = await fetch('/api/start-scrape', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url, name, max_pages }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      toast(data.error, true);
+      $('btn-scrape').removeAttribute('disabled');
+    }
+  } catch (err) {
+    toast('Network error: ' + err.message, true);
+    $('btn-scrape').removeAttribute('disabled');
+  }
+}
+</script>
+</body>
+</html>
